@@ -2,578 +2,561 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Interactive Painting — 3D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Interactive Painting — Template</title>
 <style>
-  html, body { margin:0; padding:0; background:#1c1c1c; overflow:hidden;
-               overscroll-behavior:none; height:100%; }
-  canvas { display:block; touch-action:none; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #1c1c1c;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    height: 100%;
+  }
+  #canvas-wrap { position: absolute; inset: 0; touch-action: none; }
 
-  #preload {
-    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-    color:#8a8a8a; font-family:-apple-system, sans-serif; font-size:13px;
-    letter-spacing:0.04em; background:#1c1c1c; z-index:1200;
+  #_preload_div_ {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #ccc; font-size: 14px;
   }
 
-  /* quiet chrome, bottom right, always available */
-  #viewTools {
-    position:fixed; right:12px; bottom:12px; display:flex; gap:8px; z-index:900;
-  }
-  #viewTools button {
-    background:rgba(0,0,0,0.45); color:#c9a45c; border:1px solid rgba(201,164,92,0.35);
-    font-family:-apple-system, sans-serif; font-size:12px; padding:7px 11px;
-    border-radius:3px; cursor:pointer; -webkit-tap-highlight-color:transparent;
-  }
-  #viewTools button:hover { background:rgba(0,0,0,0.7); }
-
-  /* positioning mode — only with ?edit=1 */
   #editBar {
-    position:fixed; left:0; right:0; bottom:0;
-    background:rgba(0,0,0,0.85); color:#fff;
-    font-family:-apple-system, sans-serif; font-size:13px;
-    padding:10px 14px 14px; display:none; align-items:center; gap:10px;
-    z-index:999; flex-wrap:wrap;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    font-size: 13px;
+    padding: 10px 14px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    z-index: 999;
+    flex-wrap: wrap;
   }
-  #editBar.active { display:flex; }
+  #editBar.active { display: flex; }
   #editBar button {
-    background:#c9a45c; border:none; color:#111; padding:8px 12px;
-    border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;
+    background: #c9a45c;
+    border: none;
+    color: #111;
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
   }
-  #editBar .sel { color:#c9a45c; font-weight:600; min-width:92px; }
-  #editBar .grp { display:flex; gap:6px; align-items:center; }
-  #editBar .lbl { opacity:0.55; font-size:12px; }
-  #layoutOut {
-    position:fixed; top:0; left:0; right:0; max-height:42vh; overflow:auto;
-    background:rgba(0,0,0,0.93); color:#9fe39f;
-    font-family:'SF Mono', Menlo, monospace; font-size:12px;
-    padding:14px; white-space:pre-wrap; display:none; z-index:1000;
+  #editBar span { opacity: 0.7; }
+  #editBar .selected-label { color: #c9a45c; font-weight: 600; min-width: 100px; }
+  #layoutOutput {
+    position: fixed; top: 0; left: 0; right: 0;
+    max-height: 40vh; overflow: auto;
+    background: rgba(0,0,0,0.92);
+    color: #9fe39f;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+    padding: 14px;
+    white-space: pre-wrap;
+    display: none;
+    z-index: 1000;
   }
-  #layoutOut.active { display:block; }
+  #layoutOutput.active { display: block; }
+
+  #hintBar {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: 12px 16px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+    color: #f4ede2;
+    font-size: 12.5px;
+    line-height: 1.5;
+    z-index: 9;
+    pointer-events: none;
+  }
+  #hintBar .hint { color: #c9a45c; font-weight: 600; }
+
+  #fullscreenBtn {
+    position: fixed; top: 14px; right: 16px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #f4ede2;
+    width: 40px; height: 40px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    z-index: 20;
+  }
 </style>
 </head>
 <body>
 
-<div id="preload">Loading…</div>
+<div id="canvas-wrap"></div>
+<div id="_preload_div_">Loading…</div>
 
-<div id="viewTools">
-  <button onclick="resetView()">Reset view</button>
-  <button onclick="toggleFullscreen()" id="fsBtn">Fullscreen</button>
+<button id="fullscreenBtn" title="Fullscreen">⛶</button>
+
+<div id="hintBar">
+  On a <span class="hint">piece</span>: drag to move, pinch to push/pull, double-tap to rotate.<br>
+  On the <span class="hint">background</span>: drag to orbit the view, pinch to zoom.
 </div>
 
 <div id="editBar">
-  <span class="lbl">Positioning mode</span>
-  <span class="sel" id="selLabel">none selected</span>
-  <span class="grp"><span class="lbl">size</span>
-    <button onclick="adjustScale(-0.005)">−</button>
-    <button onclick="adjustScale(0.005)">+</button></span>
-  <span class="grp"><span class="lbl">depth</span>
-    <button onclick="adjustDepth(-2)">−</button>
-    <button onclick="adjustDepth(2)">+</button></span>
-  <span class="grp"><span class="lbl">rotate</span>
-    <button onclick="rotate90('x')">X</button>
-    <button onclick="rotate90('y')">Y</button>
-    <button onclick="rotate90('z')">Z</button></span>
-  <button onclick="exportLayout()">Copy layout</button>
+  <span>Positioning mode:</span>
+  <span class="selected-label" id="selectedLabel">none selected</span>
+  <button onclick="adjustScale(-0.01)">− Smaller</button>
+  <button onclick="adjustScale(0.01)">+ Bigger</button>
+  <button onclick="adjustRotation('x', -90)">Tilt X−</button>
+  <button onclick="adjustRotation('x', 90)">Tilt X+</button>
+  <button onclick="adjustRotation('y', -90)">Turn Y−</button>
+  <button onclick="adjustRotation('y', 90)">Turn Y+</button>
+  <button onclick="adjustRotation('z', -90)">Spin Z−</button>
+  <button onclick="adjustRotation('z', 90)">Spin Z+</button>
 </div>
-<pre id="layoutOut"></pre>
+<pre id="layoutOutput"></pre>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 /* =====================================================================
-   CONFIG — the only section you edit per painting.
-   x / y / scale are carried straight over from the 2D layout, in the
-   same 700x950 canvas space. z is depth: positive comes toward viewer.
-   Piece size comes from the PNG itself, so there's nothing to measure.
+   CONFIG — reused from the finalized 2D Viandas layout. x/y carried
+   over directly (converted to a centered, y-up coordinate system);
+   z starts at 0 for every piece — use pinch in positioning mode to
+   pull pieces forward or push them back from there.
    ===================================================================== */
 const CONFIG = {
-  width: 700,
-  height: 950,
   background: "blackpaper.png",
-  backgroundZ: -70,
+  backgroundRotation: 0,
   backgroundOverfill: 1.08,
-  defaultDepth: 18,          // wood thickness in canvas units
-  collisions: true,          // false lets pieces pass through each other freely
+  pieceThickness: 20,
   pieces: [
-    { id:"villalba",       src:"villalba.png",       x:475.9, y:655.1, z:0, scale:0.200, rot:[0,0,0] },
-    { id:"fishing",        src:"fishing.png",        x:258.1, y:651.1, z:0, scale:0.200, rot:[0,0,0] },
-    { id:"eyes",           src:"eyes.png",           x:224.0, y:447.3, z:0, scale:0.200, rot:[0,0,0] },
-    { id:"lightblueblock", src:"lightblueblock.png", x:344.1, y:818.8, z:0, scale:0.200, rot:[0,0,0], depth:14 },
-    { id:"teal",           src:"teal.png",           x:164.8, y:370.0, z:0, scale:0.200, rot:[0,0,0], depth:14 },
-    { id:"brown",          src:"brown.png",          x:201.8, y:369.4, z:0, scale:0.200, rot:[0,0,0], depth:14 },
-    { id:"face",           src:"face.png",           x:451.9, y:332.2, z:0, scale:0.200, rot:[0,0,0] },
-    // fish: the block is the bottom 62.8% / left 95% of the PNG. The hook
-    // and line above it stay a flat plane flush with the block's front face.
-    { id:"fish",           src:"fish.png",           x:296.7, y:174.9, z:0, scale:0.200, rot:[0,0,0],
-      depth:16, split:{ blockW:0.950, blockH:0.628 } },
+    { id: "villalba",       src: "villalba.png",       x:  125.9, y: -180.1, z: 0, rotationZ: 0, scale: 0.200 },
+    { id: "fishing",        src: "fishing.png",        x:  -91.9, y: -176.1, z: 0, rotationZ: 0, scale: 0.200 },
+    { id: "eyes",           src: "eyes.png",           x: -126.0, y:   27.7, z: 0, rotationZ: 0, scale: 0.200 },
+    { id: "lightblueblock", src: "lightblueblock.png", x:   -5.9, y: -343.8, z: 0, rotationZ: 0, scale: 0.200 },
+    { id: "teal",           src: "teal.png",           x: -185.2, y:  105.0, z: 0, rotationZ: 0, scale: 0.200 },
+    { id: "brown",          src: "brown.png",          x: -148.2, y:  105.6, z: 0, rotationZ: 0, scale: 0.200 },
+    { id: "face",           src: "face.png",           x:  101.9, y:  142.8, z: 0, rotationZ: 0, scale: 0.200 },
+    // fish's hook and line hang past the top of the wood block. "split" gives
+    // the block a real edge and leaves the overhang flat. blockW/blockH are the
+    // painted block's share of the PNG, measured from its alpha channel.
+    // NOTE: for a split piece, x/y is the centre of the BLOCK, not of the PNG.
+    { id: "fish",           src: "fish.png",           x:  -57.1, y:  221.3, z: 0, rotationZ: 0, scale: 0.200,
+      split: { blockW: 0.950, blockH: 0.628 } },
   ]
 };
 /* ===================================================================== */
 
-const EDIT = window.location.search.includes("edit=1");
+const wrap = document.getElementById('canvas-wrap');
+const preloaderDiv = document.getElementById('_preload_div_');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1c1c1c);
 
-let scene, camera, renderer, raycaster, woodTex;
-let groups = [], meshes = [], bgMesh = null;
-let selected = null;
+const camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 1, 4000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+renderer.setPixelRatio(window.devicePixelRatio || 1);
+wrap.appendChild(renderer.domElement);
 
-// camera orbit state
-let orbit = { theta:0, phi:Math.PI/2, zoom:1 }, baseDist = 1200;
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
+dirLight.position.set(150, 200, 400);
+scene.add(dirLight);
 
-/* ---------- wood grain, generated so there's no extra asset to host ---------- */
+/* ---------------- Wood-grain placeholder texture for piece edges ---------------- */
 function makeWoodTexture() {
-  const c = document.createElement("canvas");
-  c.width = 512; c.height = 512;
-  const g = c.getContext("2d");
-  g.fillStyle = "#b08a5f"; g.fillRect(0,0,512,512);
-  for (let i=0; i<400; i++) {
-    const y = Math.random()*512;
-    const dark = Math.random() < 0.5;
-    g.strokeStyle = dark
-      ? `rgba(${70+Math.random()*45|0},${46+Math.random()*32|0},${26+Math.random()*22|0},${0.05+Math.random()*0.16})`
-      : `rgba(${225+Math.random()*25|0},${205+Math.random()*30|0},${170+Math.random()*35|0},${0.03+Math.random()*0.09})`;
-    g.lineWidth = 0.4 + Math.random()*2.4;
-    g.beginPath(); g.moveTo(0, y);
-    for (let x=0; x<=512; x+=24) g.lineTo(x, y + Math.sin((x + i*17) * 0.013) * 3.5 + (Math.random()-0.5)*1.8);
-    g.stroke();
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#5c4128';
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 40; i++) {
+    const y = Math.random() * 256;
+    const h = 1 + Math.random() * 3;
+    const shade = 70 + Math.random() * 60;
+    ctx.fillStyle = 'rgba(' + shade + ',' + (shade * 0.65) + ',' + (shade * 0.4) + ',' + (0.25 + Math.random() * 0.3) + ')';
+    ctx.fillRect(0, y, 256, h);
   }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.encoding = THREE.sRGBEncoding;
-  return t;
+  for (let i = 0; i < 8; i++) {
+    const y = Math.random() * 256;
+    ctx.strokeStyle = 'rgba(35,22,12,0.4)';
+    ctx.lineWidth = 1 + Math.random();
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let x = 0; x <= 256; x += 16) ctx.lineTo(x, y + (Math.random() - 0.5) * 6);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
 }
+const woodTexture = makeWoodTexture();
 
-// grain runs along the face's long axis, scale held constant in world units
-function woodMat(faceW, faceH) {
-  const t = woodTex.clone(); t.needsUpdate = true;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(Math.max(faceW,1)/140, Math.max(faceH,1)/140);
-  t.offset.set(Math.random(), Math.random());
-  return new THREE.MeshLambertMaterial({ map:t });
-}
+/* ---------------- Load background + all pieces ---------------- */
+const loader = new THREE.TextureLoader();
+let totalToLoad = CONFIG.pieces.length + (CONFIG.background ? 1 : 0);
+let loadedCount = 0;
+let failedFiles = [];
+const pieces = [];
 
-/* ---------- boot ---------- */
-function init() {
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1c1c1c);
-
-  camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 1, 8000);
-
-  renderer = new THREE.WebGLRenderer({ antialias:true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.outputEncoding = THREE.sRGBEncoding;
-  document.body.appendChild(renderer.domElement);
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.78));
-  const key = new THREE.DirectionalLight(0xffffff, 0.5);
-  key.position.set(0.4, 0.9, 1);
-  scene.add(key);
-
-  raycaster = new THREE.Raycaster();
-  woodTex = makeWoodTexture();
-
-  loadAll();
-}
-
-function loadAll() {
-  const loader = new THREE.TextureLoader();
-  const srcs = CONFIG.pieces.map(p => p.src);
-  if (CONFIG.background) srcs.push(CONFIG.background);
-
-  const textures = {};
-  const missing = [];
-  let settled = 0;
-  const pre = document.getElementById("preload");
-
-  // Every file settles one way or the other, so a missing PNG costs you that
-  // one piece instead of the whole painting.
-  const settle = () => {
-    if (++settled < srcs.length) {
-      pre.textContent = "Loading… " + Math.round(settled / srcs.length * 100) + "%";
-      return;
+function onAssetLoaded() {
+  loadedCount++;
+  if (failedFiles.length === 0) {
+    preloaderDiv.textContent = 'Loading… ' + Math.round((loadedCount / totalToLoad) * 100) + '%';
+  }
+  if (loadedCount >= totalToLoad) {
+    if (failedFiles.length > 0) {
+      preloaderDiv.textContent = 'Could not load: ' + failedFiles.join(', ') + ' — check filenames and that they were uploaded.';
+    } else {
+      preloaderDiv.style.display = 'none';
     }
-    if (missing.length === srcs.length) {
-      fail("No images loaded. If you opened this file by double-clicking it, "
-         + "the browser blocks local image loads — serve the folder instead "
-         + "(python3 -m http.server) or push it to GitHub Pages.");
-      return;
-    }
-    build(textures);
-    if (missing.length) {
-      pre.style.display = "block";
-      pre.style.background = "transparent";
-      pre.style.alignItems = "flex-start";
-      pre.style.pointerEvents = "none";
-      pre.textContent = "Missing: " + missing.join(", ");
-    }
-  };
-
-  srcs.forEach(src => {
-    loader.load(src, tex => {
-      tex.encoding = THREE.sRGBEncoding;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
-      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-      textures[src] = tex;
-      settle();
-    }, undefined, () => {
-      missing.push(src);
-      settle();
-    });
-  });
+    animate();
+  }
 }
 
-function fail(msg) {
-  const pre = document.getElementById("preload");
-  pre.style.display = "flex";
-  pre.style.padding = "0 28px";
-  pre.style.textAlign = "center";
-  pre.style.color = "#c9a45c";
-  pre.textContent = msg;
-}
-
-function build(tex) {
-  document.getElementById("preload").style.display = "none";
-
-  if (CONFIG.background && tex[CONFIG.background]) {
-    const t = tex[CONFIG.background];
-    const o = CONFIG.backgroundOverfill || 1;
-    bgMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(CONFIG.width*o, CONFIG.height*o),
-      new THREE.MeshBasicMaterial({ map:t })
+if (CONFIG.background) {
+  loader.load(CONFIG.background, function(tex) {
+    const img = tex.image;
+    const bg = new THREE.Mesh(
+      new THREE.PlaneGeometry(img.width, img.height),
+      new THREE.MeshStandardMaterial({ map: tex })
     );
-    bgMesh.position.z = CONFIG.backgroundZ;
-    scene.add(bgMesh);
-  }
-
-  CONFIG.pieces.forEach(p => {
-    if (!tex[p.src]) return;                      // missing file: skip this piece only
-    const g = p.split ? buildSplitPiece(p, tex[p.src]) : buildBoxPiece(p, tex[p.src]);
-    g.position.set(p.x - CONFIG.width/2, CONFIG.height/2 - p.y, p.z || 0);
-    g.rotation.set(deg(p.rot[0]), deg(p.rot[1]), deg(p.rot[2]));
-    g.userData.id = p.id;
-    g.userData.baseScale = p.scale;
-    g.userData.scale = p.scale;
-    g.userData.depth = p.depth || CONFIG.defaultDepth;
-    g.userData.baseDepth = g.userData.depth;
-    scene.add(g);
-    groups.push(g);
-    g.traverse(o => { if (o.isMesh) { o.userData.group = g; meshes.push(o); } });
+    const rot = CONFIG.backgroundRotation || 0;
+    bg.rotation.z = THREE.MathUtils.degToRad(rot);
+    // Scale so the panel fully covers the working area regardless of source orientation/size
+    const targetSize = 950;
+    const fitScale = (rot % 180 !== 0)
+      ? Math.max(targetSize / img.height, targetSize / img.width)
+      : Math.max(targetSize / img.width, targetSize / img.height);
+    const overfill = CONFIG.backgroundOverfill || 1;
+    bg.scale.set(fitScale * overfill, fitScale * overfill, 1);
+    bg.position.z = -150;
+    scene.add(bg);
+    onAssetLoaded();
+  }, undefined, function(err) {
+    console.error('Failed to load background:', CONFIG.background, err);
+    failedFiles.push(CONFIG.background);
+    onAssetLoaded();
   });
-
-  if (EDIT) document.getElementById("editBar").classList.add("active");
-  bindInput();
-  onResize();
-  window.addEventListener("resize", onResize);
-  renderer.setAnimationLoop(render);
 }
 
-const deg = d => (d || 0) * Math.PI / 180;
+CONFIG.pieces.forEach(function(p) {
+  loader.load(p.src, function(tex) {
+    tex.minFilter = THREE.LinearFilter;
+    const img = tex.image;
+    const w = img.width * p.scale;
+    const h = img.height * p.scale;
 
-/* ---------- a plain block ---------- */
-function buildBoxPiece(p, tex) {
-  const g = new THREE.Group();
-  const W = tex.image.width * p.scale, H = tex.image.height * p.scale;
-  const d = p.depth || CONFIG.defaultDepth;
-
-  const face = new THREE.MeshBasicMaterial({ map:tex, transparent:true, alphaTest:0.5 });
-  const lr = woodMat(d, H), tb = woodMat(W, d), back = woodMat(W, H);
-
-  const block = new THREE.Mesh(
-    new THREE.BoxGeometry(W, H, d),
-    [lr, lr, tb, tb, face, back]
-  );
-  g.add(block);
-  g.userData.block = block;
-  return g;
-}
-
-/* ---------- a block with a flat extension (fish: hook + line) ---------- */
-function buildSplitPiece(p, tex) {
-  const g = new THREE.Group();
-  const W = tex.image.width * p.scale, H = tex.image.height * p.scale;
-  const d = p.depth || CONFIG.defaultDepth;
-  const bw = W * p.split.blockW, bh = H * p.split.blockH;
-
-  // block — front face UV-cropped to the painted rectangle only
-  const faceTex = tex.clone(); faceTex.needsUpdate = true;
-  faceTex.repeat.set(p.split.blockW, p.split.blockH);
-  faceTex.offset.set(0, 0);                       // v=0 is the image bottom
-  const face = new THREE.MeshBasicMaterial({ map:faceTex, transparent:true, alphaTest:0.5 });
-  const lr = woodMat(d, bh), tb = woodMat(bw, d), back = woodMat(bw, bh);
-
-  const block = new THREE.Mesh(
-    new THREE.BoxGeometry(bw, bh, d),
-    [lr, lr, tb, tb, face, back]
-  );
-  block.position.set(-(W - bw)/2, -(H - bh)/2, 0);   // anchored bottom-left
-  g.add(block);
-
-  // hook + line — flat, flush with the block's front face.
-  // no alphaTest here: the line is 1–2 antialiased pixels and would shred.
-  const topTex = tex.clone(); topTex.needsUpdate = true;
-  topTex.repeat.set(1, 1 - p.split.blockH);
-  topTex.offset.set(0, p.split.blockH);
-  const top = new THREE.Mesh(
-    new THREE.PlaneGeometry(W, H - bh),
-    new THREE.MeshBasicMaterial({
-      map:topTex, transparent:true, depthWrite:false, side:THREE.DoubleSide
-    })
-  );
-  top.position.set(0, bh/2, d/2);
-  top.renderOrder = 1;
-  g.add(top);
-
-  g.userData.block = block;      // only the block collides
-  g.userData.flat = top;
-  return g;
-}
-
-/* ---------- collision ----------
-   This composition starts with pieces already overlapping — that's the 2D
-   collage. So a plain "is anything touching?" test would freeze every one of
-   them permanently. Instead we measure how deeply a piece is buried and only
-   refuse a move that buries it deeper. Overlapped pieces stay draggable and
-   can work themselves free; separated pieces still stop against each other.
------------------------------------------------------------------- */
-function boxOf(g) {
-  const b = new THREE.Box3().setFromObject(g.userData.block || g);
-  b.expandByScalar(-1);          // let edges touch without locking
-  return b;
-}
-function penetration(g) {
-  const a = boxOf(g);
-  let total = 0;
-  for (const o of groups) {
-    if (o === g) continue;
-    const b = boxOf(o);
-    const dx = Math.min(a.max.x, b.max.x) - Math.max(a.min.x, b.min.x);
-    const dy = Math.min(a.max.y, b.max.y) - Math.max(a.min.y, b.min.y);
-    const dz = Math.min(a.max.z, b.max.z) - Math.max(a.min.z, b.min.z);
-    if (dx > 0 && dy > 0 && dz > 0) total += Math.min(dx, dy, dz);
-  }
-  return total;
-}
-function moveResolved(g, target) {
-  if (CONFIG.collisions === false) {
-    g.position.set(target.x, target.y, target.z !== undefined ? target.z : g.position.z);
-    return;
-  }
-  const prev = g.position.clone();
-  let before = penetration(g);
-  const tryAxis = (axis, v) => {
-    if (v === undefined) return;
-    g.position[axis] = v;
-    const after = penetration(g);
-    if (after > before + 0.5) g.position[axis] = prev[axis];
-    else before = after;
-  };
-  tryAxis("x", target.x);
-  tryAxis("y", target.y);
-  tryAxis("z", target.z);
-}
-
-/* ---------- input ----------
-   1 finger on a piece: move it in the painting plane
-   1 finger on the paper: orbit the whole view
-   2 fingers on a piece: push it into / pull it out of depth
-   2 fingers on the paper (or wheel): zoom
------------------------------------------------------------------- */
-const pointers = new Map();
-let mode = null, dragG = null, dragOff = new THREE.Vector3();
-let pinchStart = 0, pinchBase = 0, lastX = 0, lastY = 0;
-// double-tap to rotate 90°, same as the 2D version — available to everyone,
-// not just positioning mode
-let tapG = null, tapMoved = false, tapDownX = 0, tapDownY = 0;
-let lastTapAt = 0, lastTapG = null;
-const TAP_MOVE = 6, TAP_WINDOW = 350;
-const dragPlane = new THREE.Plane();
-const hit = new THREE.Vector3();
-
-function ndc(e) {
-  return new THREE.Vector2(
-    (e.clientX / window.innerWidth) * 2 - 1,
-    -(e.clientY / window.innerHeight) * 2 + 1
-  );
-}
-function pick(e) {
-  raycaster.setFromCamera(ndc(e), camera);
-  const hits = raycaster.intersectObjects(meshes, false);
-  return hits.length ? hits[0].object.userData.group : null;
-}
-function planeHit(e, z) {
-  dragPlane.set(new THREE.Vector3(0,0,1), -z);
-  raycaster.setFromCamera(ndc(e), camera);
-  return raycaster.ray.intersectPlane(dragPlane, hit) ? hit.clone() : null;
-}
-function pinchDist() {
-  const p = [...pointers.values()];
-  return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
-}
-
-function bindInput() {
-  const el = renderer.domElement;
-  el.addEventListener("pointerdown", e => {
-    el.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
-    lastX = e.clientX; lastY = e.clientY;
-
-    if (pointers.size === 1) {
-      const g = pick(e);
-      if (g) {
-        mode = "drag"; dragG = g; selected = g; updateSel();
-        tapG = g; tapMoved = false; tapDownX = e.clientX; tapDownY = e.clientY;
-        const h = planeHit(e, g.position.z);
-        if (h) dragOff.copy(g.position).sub(h);
-      } else {
-        mode = "orbit";
-      }
-    } else if (pointers.size === 2) {
-      pinchStart = pinchDist();
-      if (mode === "drag" && dragG) { mode = "depth"; pinchBase = dragG.position.z; }
-      else { mode = "zoom"; pinchBase = orbit.zoom; }
+    let mesh;
+    if (p.split) {
+      // Crop the front-face UVs to the painted block, so the wood edge lands
+      // on the real edge of the wood instead of around empty air.
+      const bw = w * p.split.blockW, bh = h * p.split.blockH;
+      const faceTex = tex.clone(); faceTex.needsUpdate = true;
+      faceTex.repeat.set(p.split.blockW, p.split.blockH);
+      faceTex.offset.set(0, 0);                   // v=0 is the image bottom
+      const frontMat = new THREE.MeshStandardMaterial({
+        map: faceTex, transparent: true, alphaTest: 0.05
+      });
+      const sideMat = new THREE.MeshStandardMaterial({ map: woodTexture });
+      mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(bw, bh, CONFIG.pieceThickness),
+        [sideMat, sideMat, sideMat, sideMat, frontMat, sideMat]
+      );
+      // The overhang rides along as a flat child, flush with the block's front
+      // face. No alphaTest here: the line is one or two antialiased pixels and
+      // alpha-testing would break it into dashes.
+      const overTex = tex.clone(); overTex.needsUpdate = true;
+      overTex.repeat.set(1, 1 - p.split.blockH);
+      overTex.offset.set(0, p.split.blockH);
+      const over = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h - bh),
+        new THREE.MeshStandardMaterial({
+          map: overTex, transparent: true, depthWrite: false, side: THREE.DoubleSide
+        })
+      );
+      over.position.set((w - bw) / 2, h / 2, CONFIG.pieceThickness / 2);
+      over.renderOrder = 1;
+      mesh.add(over);
+      mesh.userData.over = over;
+    } else if (p.flat) {
+      // Some shapes (thin, irregular silhouettes) don't read well as a
+      // chunky box — render these as a plain flat, double-sided image instead.
+      const frontMat = new THREE.MeshStandardMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.05,
+        side: THREE.DoubleSide
+      });
+      mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), frontMat);
+    } else {
+      const frontMat = new THREE.MeshStandardMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.05
+      });
+      const sideMat = new THREE.MeshStandardMaterial({ map: woodTexture });
+      const materials = [sideMat, sideMat, sideMat, sideMat, frontMat, sideMat];
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, CONFIG.pieceThickness), materials);
     }
+
+    mesh.position.set(p.x, p.y, p.z);
+    mesh.rotation.x = THREE.MathUtils.degToRad(p.rotationX || 0);
+    mesh.rotation.y = THREE.MathUtils.degToRad(p.rotationY || 0);
+    mesh.rotation.z = THREE.MathUtils.degToRad(p.rotationZ || 0);
+    mesh.userData.id = p.id;
+    mesh.userData.src = p.src;
+    mesh.userData.baseW = p.split ? img.width  * p.split.blockW : img.width;
+    mesh.userData.baseH = p.split ? img.height * p.split.blockH : img.height;
+    mesh.userData.flat = !!p.flat;
+    mesh.userData.targetRotationX = mesh.rotation.x;
+    mesh.userData.targetRotationY = mesh.rotation.y;
+    mesh.userData.targetRotationZ = mesh.rotation.z;
+    scene.add(mesh);
+    pieces.push(mesh);
+    onAssetLoaded();
+  }, undefined, function(err) {
+    console.error('Failed to load piece:', p.src, err);
+    failedFiles.push(p.src);
+    onAssetLoaded();
   });
+});
 
-  el.addEventListener("pointermove", e => {
-    if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+/* ---------------- Orbit camera (background drag/pinch) ---------------- */
+const target = new THREE.Vector3(0, 0, 0);
+let radius = 950, theta = 0.5, phi = 1.2;
+const MIN_RADIUS = 300, MAX_RADIUS = 2000;
+const MIN_PHI = 0.15, MAX_PHI = Math.PI - 0.15;
 
-    if (mode === "drag" && dragG) {
-      if (Math.abs(e.clientX - tapDownX) > TAP_MOVE ||
-          Math.abs(e.clientY - tapDownY) > TAP_MOVE) tapMoved = true;
-      const h = planeHit(e, dragG.position.z);
-      if (h) moveResolved(dragG, h.add(dragOff));
-    } else if (mode === "orbit") {
-      orbit.theta -= (e.clientX - lastX) * 0.005;
-      orbit.phi   -= (e.clientY - lastY) * 0.005;
-      orbit.phi = Math.max(0.18, Math.min(Math.PI - 0.18, orbit.phi));
-      orbit.theta = Math.max(-1.15, Math.min(1.15, orbit.theta));
-    } else if (mode === "depth" && dragG && pointers.size === 2) {
-      const f = pinchDist() / pinchStart;
-      moveResolved(dragG, { x:dragG.position.x, y:dragG.position.y,
-                            z: Math.max(-55, Math.min(260, pinchBase + (f - 1) * 320)) });
-    } else if (mode === "zoom" && pointers.size === 2) {
-      orbit.zoom = Math.max(0.35, Math.min(2.4, pinchBase / (pinchDist() / pinchStart)));
-    }
-    lastX = e.clientX; lastY = e.clientY;
+function updateCameraFromOrbit() {
+  camera.position.x = target.x + radius * Math.sin(phi) * Math.sin(theta);
+  camera.position.y = target.y + radius * Math.cos(phi);
+  camera.position.z = target.z + radius * Math.sin(phi) * Math.cos(theta);
+  camera.lookAt(target);
+}
+updateCameraFromOrbit();
+
+function animate() {
+  requestAnimationFrame(animate);
+  pieces.forEach(function(m) {
+    m.rotation.x += (m.userData.targetRotationX - m.rotation.x) * 0.15;
+    m.rotation.y += (m.userData.targetRotationY - m.rotation.y) * 0.15;
+    m.rotation.z += (m.userData.targetRotationZ - m.rotation.z) * 0.15;
   });
-
-  const up = e => {
-    pointers.delete(e.pointerId);
-
-    if (pointers.size === 0 && tapG && !tapMoved) {
-      const now = Date.now();
-      if (lastTapG === tapG && now - lastTapAt < TAP_WINDOW) {
-        tapG.rotation.z += Math.PI / 2;   // rotates in the painting plane
-        lastTapAt = 0; lastTapG = null;
-      } else {
-        lastTapAt = now; lastTapG = tapG;
-      }
-    }
-    if (pointers.size === 0) { mode = null; dragG = null; tapG = null; }
-    else if (pointers.size === 1 && (mode === "zoom" || mode === "depth")) mode = null;
-  };
-  el.addEventListener("pointerup", up);
-  el.addEventListener("pointercancel", up);
-
-  el.addEventListener("wheel", e => {
-    e.preventDefault();
-    orbit.zoom = Math.max(0.35, Math.min(2.4, orbit.zoom * (1 + e.deltaY * 0.0011)));
-  }, { passive:false });
-
-  document.addEventListener("gesturestart", e => e.preventDefault());
-}
-
-/* ---------- view ---------- */
-function onResize() {
-  const w = window.innerWidth, h = window.innerHeight;
-  renderer.setSize(w, h);
-  camera.aspect = w / h;
-  const vf = camera.fov * Math.PI / 180;
-  const byH = (CONFIG.height / 2) / Math.tan(vf / 2);
-  const byW = (CONFIG.width / 2) / Math.tan(vf / 2) / camera.aspect;
-  baseDist = Math.max(byH, byW) * 1.06;
-  camera.updateProjectionMatrix();
-}
-
-function render() {
-  const d = baseDist * orbit.zoom;
-  camera.position.set(
-    d * Math.sin(orbit.phi) * Math.sin(orbit.theta),
-    d * Math.cos(orbit.phi),
-    d * Math.sin(orbit.phi) * Math.cos(orbit.theta)
-  );
-  camera.lookAt(0, 0, 0);
   renderer.render(scene, camera);
 }
 
-function resetView() { orbit.theta = 0; orbit.phi = Math.PI/2; orbit.zoom = 1; }
+window.addEventListener('resize', () => {
+  camera.aspect = wrap.clientWidth / wrap.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+});
 
-function toggleFullscreen() {
-  const btn = document.getElementById("fsBtn");
+/* ---------------- Interaction ---------------- */
+const raycaster = new THREE.Raycaster();
+let selected = null;
+let selectedPieceId = null;
+
+if (window.location.search.includes("edit=1")) {
+  document.getElementById("editBar").classList.add("active");
+}
+
+/* ---------------- Fullscreen toggle ---------------- */
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+fullscreenBtn.addEventListener('click', () => {
   if (!document.fullscreenElement) {
-    (document.documentElement.requestFullscreen ||
-     document.documentElement.webkitRequestFullscreen).call(document.documentElement);
-    btn.textContent = "Exit fullscreen";
+    document.documentElement.requestFullscreen().catch(() => {});
   } else {
-    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-    btn.textContent = "Fullscreen";
+    document.exitFullscreen();
+  }
+});
+
+function updateSelectedLabel() {
+  document.getElementById('selectedLabel').textContent = selectedPieceId ? selectedPieceId : 'none selected';
+}
+
+function adjustRotation(axis, degrees) {
+  if (!selected) return;
+  const rad = THREE.MathUtils.degToRad(degrees);
+  if (axis === 'x') selected.userData.targetRotationX += rad;
+  if (axis === 'y') selected.userData.targetRotationY += rad;
+  if (axis === 'z') selected.userData.targetRotationZ += rad;
+}
+
+function adjustScale(delta) {
+  if (!selected) return;
+  const p = CONFIG.pieces.find(pc => pc.id === selectedPieceId);
+  p.scale = Math.max(0.02, p.scale + delta);
+  const w = selected.userData.baseW * p.scale;
+  const h = selected.userData.baseH * p.scale;
+  selected.geometry.dispose();
+  selected.geometry = selected.userData.flat
+    ? new THREE.PlaneGeometry(w, h)
+    : new THREE.BoxGeometry(w, h, CONFIG.pieceThickness);
+  const over = selected.userData.over;
+  if (over && p.split) {
+    const fullW = w / p.split.blockW, fullH = h / p.split.blockH;
+    over.geometry.dispose();
+    over.geometry = new THREE.PlaneGeometry(fullW, fullH - h);
+    over.position.set((fullW - w) / 2, fullH / 2, CONFIG.pieceThickness / 2);
   }
 }
 
-/* ---------- positioning mode ---------- */
-function updateSel() {
-  const l = document.getElementById("selLabel");
-  if (l) l.textContent = selected ? selected.userData.id : "none selected";
-}
-function adjustScale(delta) {
-  if (!selected) return;
-  const u = selected.userData;
-  u.scale = Math.max(0.02, u.scale + delta);
-  selected.scale.setScalar(u.scale / u.baseScale);
-}
-function adjustDepth(delta) {
-  if (!selected) return;
-  const u = selected.userData;
-  u.depth = Math.max(4, u.depth + delta);
-  const f = u.depth / u.baseDepth;
-  u.block.scale.z = f;
-  if (u.flat) u.flat.position.z = (u.baseDepth * f) / 2;
-}
-function rotate90(axis) {
-  if (!selected) return;
-  selected.rotation[axis] += Math.PI / 2;
-}
-function exportLayout() {
-  const lines = groups.map(g => {
-    const u = g.userData, p = CONFIG.pieces.find(c => c.id === u.id);
-    const r = a => Math.round(((g.rotation[a] * 180 / Math.PI) % 360 + 360) % 360);
-    return '    { id:"' + u.id + '", src:"' + p.src + '", ' +
-      'x:' + (g.position.x + CONFIG.width/2).toFixed(1) + ', ' +
-      'y:' + (CONFIG.height/2 - g.position.y).toFixed(1) + ', ' +
-      'z:' + g.position.z.toFixed(1) + ', ' +
-      'scale:' + u.scale.toFixed(3) + ', ' +
-      'rot:[' + r("x") + ',' + r("y") + ',' + r("z") + ']' +
-      ', depth:' + Math.round(u.depth) +
-      (p.split ? ', split:{ blockW:' + p.split.blockW + ', blockH:' + p.split.blockH + ' }' : '') +
-      ' },';
-  });
-  const out = "pieces: [\n" + lines.join("\n") + "\n  ]";
-  const el = document.getElementById("layoutOut");
-  el.textContent = out;
-  el.classList.add("active");
-  if (navigator.clipboard) navigator.clipboard.writeText(out);
+function getNDC(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  return new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1
+  );
 }
 
-window.addEventListener("error", e => {
-  if (!groups.length) fail("Error: " + (e.message || "unknown") + " — open the browser console for detail.");
+function pickPiece(clientX, clientY) {
+  const ndc = getNDC(clientX, clientY);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(pieces);
+  return hits.length ? hits[0].object : null;
+}
+
+let dragStart = null;
+let moved = false;
+let lastTapTime = 0;
+const TAP_MOVE_THRESHOLD = 8;
+const DOUBLE_TAP_WINDOW = 350;
+
+let activePointers = new Map();
+let interactionTarget = null;
+let pinchStartDist = null;
+let pinchStartZ = null;
+let orbitStart = null;
+
+function pointerDist(pts) {
+  const arr = Array.from(pts.values());
+  const dx = arr[0].x - arr[1].x;
+  const dy = arr[0].y - arr[1].y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  renderer.domElement.setPointerCapture(e.pointerId);
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (activePointers.size === 1) {
+    const hit = pickPiece(e.clientX, e.clientY);
+    if (hit) {
+      selected = hit;
+      selectedPieceId = hit.userData.id;
+      interactionTarget = 'piece';
+      updateSelectedLabel();
+    } else {
+      interactionTarget = 'background';
+    }
+    dragStart = { x: e.clientX, y: e.clientY };
+    orbitStart = { theta, phi, x: e.clientX, y: e.clientY };
+    moved = false;
+  }
+
+  if (activePointers.size === 2) {
+    pinchStartDist = pointerDist(activePointers);
+    pinchStartZ = (interactionTarget === 'piece' && selected) ? selected.position.z : null;
+  }
 });
 
-if (typeof THREE === "undefined") {
-  fail("three.js didn't load. Check the connection, or host a copy of "
-     + "three.min.js next to this file and point the script tag at it.");
-} else {
-  try { init(); }
-  catch (err) { fail("Error: " + err.message); }
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (activePointers.size === 1 && dragStart) {
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    if (Math.abs(dx) > TAP_MOVE_THRESHOLD || Math.abs(dy) > TAP_MOVE_THRESHOLD) moved = true;
+
+    if (interactionTarget === 'piece' && selected) {
+      const depthScale = (radius - selected.position.z) / radius;
+      selected.position.x += dx * depthScale;
+      selected.position.y -= dy * depthScale;
+      dragStart = { x: e.clientX, y: e.clientY };
+    } else if (interactionTarget === 'background' && orbitStart) {
+      const totalDx = e.clientX - orbitStart.x;
+      const totalDy = e.clientY - orbitStart.y;
+      theta = orbitStart.theta - totalDx * 0.008;
+      phi = Math.max(MIN_PHI, Math.min(MAX_PHI, orbitStart.phi - totalDy * 0.008));
+      updateCameraFromOrbit();
+    }
+  }
+
+  if (activePointers.size === 2) {
+    const dist = pointerDist(activePointers);
+    if (interactionTarget === 'piece' && selected && pinchStartDist) {
+      const delta = (dist - pinchStartDist) * 0.6;
+      selected.position.z = pinchStartZ + delta;
+    } else if (interactionTarget === 'background' && pinchStartDist) {
+      const delta = (dist - pinchStartDist);
+      radius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, radius - delta * 1.5));
+      updateCameraFromOrbit();
+      pinchStartDist = dist;
+    }
+  }
+});
+
+function endPointer(e) {
+  activePointers.delete(e.pointerId);
+  pinchStartDist = null;
+
+  if (activePointers.size === 0) {
+    if (interactionTarget === 'piece' && selected && !moved) {
+      const now = Date.now();
+      if (now - lastTapTime < DOUBLE_TAP_WINDOW) {
+        selected.userData.targetRotationZ += Math.PI / 2;
+        lastTapTime = 0;
+      } else {
+        lastTapTime = now;
+      }
+    }
+    interactionTarget = null;
+  }
+  dragStart = null;
+  orbitStart = null;
 }
+
+renderer.domElement.addEventListener('pointerup', endPointer);
+renderer.domElement.addEventListener('pointercancel', endPointer);
+
+renderer.domElement.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const hover = pickPiece(e.clientX, e.clientY);
+  if (hover) {
+    hover.position.z -= e.deltaY * 0.5;
+  } else {
+    radius = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, radius + e.deltaY * 1.2));
+    updateCameraFromOrbit();
+  }
+}, { passive: false });
+
+/* ---------------- Export current layout (positioning mode) ---------------- */
+function exportLayout() {
+  function norm360(rad) {
+    return (((THREE.MathUtils.radToDeg(rad) % 360) + 360) % 360).toFixed(0);
+  }
+  const lines = CONFIG.pieces.map(function(p) {
+    const mesh = pieces.find(m => m.userData.id === p.id);
+    if (!mesh) return null;
+    const rotX = norm360(mesh.userData.targetRotationX);
+    const rotY = norm360(mesh.userData.targetRotationY);
+    const rotZ = norm360(mesh.userData.targetRotationZ);
+    const flatPart = p.flat ? ', flat: true' : '';
+    const splitPart = p.split ? ', split: { blockW: ' + p.split.blockW +
+      ', blockH: ' + p.split.blockH + ' }' : '';
+    return '    { id: "' + p.id + '", src: "' + p.src + '", x: ' +
+      mesh.position.x.toFixed(1) + ', y: ' + mesh.position.y.toFixed(1) + ', z: ' + mesh.position.z.toFixed(1) +
+      ', rotationX: ' + rotX + ', rotationY: ' + rotY + ', rotationZ: ' + rotZ +
+      ', scale: ' + p.scale.toFixed(3) + flatPart + splitPart + ' },';
+  }).filter(Boolean);
+  const output = "pieces: [\n" + lines.join("\n") + "\n  ]";
+  const out = document.getElementById('layoutOutput');
+  out.textContent = output;
+  out.classList.add('active');
+  if (navigator.clipboard) navigator.clipboard.writeText(output);
+  console.log(output);
+}
+// Not exposed as a visible button — call exportLayout() from the browser
+// console (right-click → Inspect → Console) when you personally want to
+// save the current arrangement. Visitors have no way to trigger this.
+window.exportLayout = exportLayout;
 </script>
+
 </body>
 </html>
